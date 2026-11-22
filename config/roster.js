@@ -9,6 +9,10 @@ window.ROSTER = [
   "label": "Block 1 Plett",
   "students": [
    {
+    "id": "B1-bob-test",
+    "name": "Bob (Teacher Test)"
+   },
+   {
     "id": "B1-aaron-a",
     "name": "Aaron A."
    },
