@@ -1,7 +1,7 @@
 // SETTINGS: Mrs. Plett edits this file (on GitHub: open the file, click the pencil, Commit).
 window.SETTINGS = {
   // 1) Shared data: paste the Google Apps Script web app URL here (ends in /exec). Blank = this Chromebook only.
-  SHEET_URL: "",
+  SHEET_URL: "https://script.google.com/macros/s/AKfycbyzqlf18lAzGynqWnGt8hFjHHvpxN6JMfMTuLLJWB6MERcTUpbTB7fj8v2Hyj1SdAv-5Q/exec",
   // 2) Teacher PIN for this site's dashboard. PLACEHOLDER: change it before kids use the site.
   //    When SHEET_URL is set, the Google Sheet also checks its own TEACHER_PIN (a Script Property you set in Apps Script).
   TEACHER_PIN: "0000",
