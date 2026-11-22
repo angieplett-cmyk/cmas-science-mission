@@ -22,7 +22,7 @@ window.Store=(function(){
     flushing=false; if(LS.get('cmas.queue',[]).length && navigator.onLine) setTimeout(flush,5000); }
   setInterval(flush,20000); window.addEventListener('online',flush);
   async function loadStudent(sid){ let evs=localEvents(sid);
-    if(online()){ try{ const r=await fetch(S.SHEET_URL+'?action=student&sid='+encodeURIComponent(sid)); const j=await r.json(); if(j.ok){ evs=merge(evs,j.events.map(fixEv)); LS.set(evKey(sid),evs);} }catch(e){} }
+    if(online()){ try{ const r=await fetch(S.SHEET_URL+'?action=student&stu='+encodeURIComponent(sid)); const j=await r.json(); if(j.ok){ evs=merge(evs,j.events.map(fixEv)); LS.set(evKey(sid),evs);} }catch(e){} }
     return evs; }
   function fixEv(e){ e.n=e.n===''?undefined:e.n; ['ms','tries','idleMs','offTab'].forEach(k=>{if(e[k]!==''&&e[k]!=null)e[k]=Number(e[k]);}); if(e.ts instanceof Date) e.ts=e.ts.toISOString(); return e; }
   async function loadAll(pin){ let evs=allLocal(); let source='this Chromebook only';
@@ -36,7 +36,9 @@ window.Store=(function(){
 
   // ---------- analytics ----------
   const IT=D.ITEMS;
-  const answers=evs=>evs.filter(e=>e.type==='answer'&&IT[e.item]);
+  // Teacher "Reset test" (type cp_reset) voids that checkpoint's earlier answers (for test accounts / invalid sittings).
+  function resets(evs){ const r={}; evs.forEach(e=>{ if(e.type==='cp_reset'&&e.ctx&&(!r[e.ctx]||e.ts>r[e.ctx])) r[e.ctx]=e.ts; }); return r; }
+  const answers=evs=>{ const r=resets(evs); return evs.filter(e=>e.type==='answer'&&IT[e.item]&&!(e.mode==='checkpoint'&&r[e.ctx]&&String(e.ts)<=String(r[e.ctx]))); };
   function firstAttempts(evs){const m={};answers(evs).forEach(e=>{if(!m[e.item])m[e.item]=e;});return m;}
   function latestAttempts(evs){const m={};answers(evs).forEach(e=>{m[e.item]=e;});return m;}
   const cleanFirst=e=>!!(e&&e.correct&&Number(e.tries)===1&&!e.hint);
@@ -57,7 +59,13 @@ window.Store=(function(){
     if(S.PRETEST_INCLUDE_MAP) window.NUMBERING.map.forEach(m=>m.steps.forEach(s=>ids.push(s.id)));
     return ids; }
   function pretestState(evs,cp){ cp=cp||'pre'; const pre=answers(evs).filter(e=>e.mode==='checkpoint'&&e.ctx===cp); const done=new Set(pre.map(e=>e.item));
-    const finished=evs.some(e=>e.type==='checkpoint_done'&&e.ctx===cp); return {done,finished,events:pre}; }
+    const mine=evs.filter(e=>e.ctx===cp&&['checkpoint_done','cp_reset','cp_reopen','pause','teacher_pause','resume'].includes(e.type)).sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
+    let finished=false, paused=null;
+    mine.forEach(e=>{ if(e.type==='checkpoint_done'){finished=true; paused=null;} else if(e.type==='cp_reset'||e.type==='cp_reopen'){finished=false; paused=null;} else if(e.type==='pause'||e.type==='teacher_pause') paused=e; else if(e.type==='resume') paused=null; });
+    if(finished) paused=null;
+    return {done,finished,events:pre,paused,partial:!finished&&done.size>0}; }
+  // Latest unresolved pause for a non-checkpoint mission (practice / review / skill / MAP)
+  function openPause(evs){ let last=null; evs.forEach(e=>{ if(e.type==='pause'&&e.mode!=='checkpoint') last=e; else if(last&&(e.type==='resume'||e.type==='day_done')&&e.ctx===last.ctx) last=null; }); return last; }
   function points(id){return IT[id].kind==='cr'?2:1;}
   function pretestScore(evs,cpId){ const st=pretestState(evs,cpId); let earned=0,possible=0,ce=0,cp=0; const byTopic={};
     st.events.forEach(e=>{ const p=points(e.item); possible+=p; if(e.correct) earned+=p; if(IT[e.item].src==='cmas'){cp+=p; if(e.correct) ce+=p;}
@@ -116,5 +124,5 @@ window.Store=(function(){
       o.score=Math.max(0,Math.min(100,o.score+(cleanFirst(e)?M.FIRST_TRY:e.correct?M.WITH_HELP:M.MISS))); }));
     Object.values(out).forEach(o=>{ o.group=o.score>=M.PROFICIENT?'got':(o.n>0&&o.score>=S.STD_GETTING_THERE)?'getting':'notyet'; o.level=o.n===0?'n':(o.score>=M.MASTERED?'m':o.score>=M.PROFICIENT?'p':'pr'); });
     return out; }
-  return {applySettings,getRoster,saveRoster,rosterBlocks,seedRoster,slug,BLOCKS,stdKeys,stdMastery,band,getConfig,setConfig,LS,log,flush,loadStudent,loadAll,sendLive,loadLive,online,firstAttempts,latestAttempts,cleanFirst,mastery,reviewList,pretestItems,pretestState,pretestScore,usage,dayKey,suggestions,WHERE,topicsOf,answers,points,uid,merge};
+  return {openPause,resets,applySettings,getRoster,saveRoster,rosterBlocks,seedRoster,slug,BLOCKS,stdKeys,stdMastery,band,getConfig,setConfig,LS,log,flush,loadStudent,loadAll,sendLive,loadLive,online,firstAttempts,latestAttempts,cleanFirst,mastery,reviewList,pretestItems,pretestState,pretestScore,usage,dayKey,suggestions,WHERE,topicsOf,answers,points,uid,merge};
 })();

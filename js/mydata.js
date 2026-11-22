@@ -46,7 +46,7 @@ function show(evs,sess,lg,back){ lang=lg; const first=ST.firstAttempts(evs), lat
   low.forEach(([t])=>means.push(L(`${tx(D.TOPICS[t])} is a tricky spot for you. Practice it next.`,`${tx(D.TOPICS[t])} es un punto difícil para ti. Practícalo después.`)));
   strong.forEach(([t])=>means.push(L(`${tx(D.TOPICS[t])} is a strong spot for you!`,`¡${tx(D.TOPICS[t])} es un punto fuerte para ti!`)));
   if(cps.length>1) { const a=cps[0], b=cps[cps.length-1]; means.push(L(`From ${a.c.name} to ${b.c.name}, your score went from ${a.pct}% to ${b.pct}%.`,`De ${a.c.name} a ${b.c.name}, tu puntaje pasó de ${a.pct}% a ${b.pct}%.`)); }
-  const lastCp=cps[cps.length-1];
+  const lastCp=cps.filter(c=>c.finished).pop();
   const sug=ST.suggestions(evs);
   let h=`<div class="card"><h2>📊 ${T('mydata')} · ${esc(sess.name)}</h2>
     <div class="grid g4 stats"><div class="stat"><b>${firstPct}%</b><span>${T('firstTry')}</span></div><div class="stat"><b>${latestPct}%</b><span>${T('latest')}</span></div>

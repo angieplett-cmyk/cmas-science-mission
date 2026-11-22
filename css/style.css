@@ -159,3 +159,7 @@ tr.hot td{background:#fff1f2}.code-ok{font-family:ui-monospace,monospace;font-we
 input.rit{width:52px;font-size:15px} select,input[type=date]{font-size:16px;padding:4px}
 @media print{.noprint,.tabs{display:none!important}}
 .bl .es,.stem .es,.pl .es{display:block;font-weight:600;color:#7a4b00;font-size:.9em}
+.pausebtn{margin-left:auto;font-size:17px;padding:8px 14px}
+.resumecard{border:4px solid #ffd23f}
+.btn.big{font-size:24px;padding:14px 26px}
+.f-pause{background:#e0e7ff;color:#3730a3}

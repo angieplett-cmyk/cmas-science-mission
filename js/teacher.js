@@ -78,7 +78,7 @@ C.flags=function(s){ const st=C.stu[s.id], out=[], P=S.PACE; const ans=ST.answer
     if(signals.length>=3) out.push({id:s.id+'|copy|'+pid,kind:`Possible copying — check in (with ${C.stu[pid].s.name})`,level:'f-none',evidence:m.slice(0,6).map(x=>`${C.label(x.e.item)}: both chose "${x.e.detail.answer}"`),note:'Several signals together: '+signals.join('; ')+'. Could also be sitting together, a shared misconception, or coincidence — please verify before acting.'}); });
   // no activity / not working
   if(!st.evs.length) out.push({id:s.id+'|none',kind:'No activity yet',level:'f-none',evidence:['No saved work on any device or in the shared store.'],note:''});
-  else { const sess=st.evs.filter(e=>e.type==='session'); const empty=sess.filter(e=>Number(e.ms)>P.NO_PROGRESS_MINUTES*60000&&!(e.detail&&e.detail.answers));
+  else { const sess=st.evs.filter(e=>e.type==='session'); const empty=sess.filter(e=>Number(e.ms)>P.NO_PROGRESS_MINUTES*60000&&!(e.detail&&(e.detail.answers||e.detail.paused)));
     if(empty.length) out.push({id:s.id+'|noprog',kind:'Not working: logged in with no progress',level:'f-none',evidence:empty.slice(0,6).map(e=>`${new Date(e.ts).toLocaleString()}: ${sec(e.ms)} signed in, 0 answers, idle ${sec(e.idleMs)}, off-tab ${e.offTab||0}×`),note:''});
     const last=ans.length?new Date(ans[ans.length-1].ts):null; if(last&&Date.now()-last>5*86400000) out.push({id:s.id+'|stale',kind:'No answers in 5+ school days',level:'f-off',evidence:[`Last answer ${last.toLocaleDateString()}`],note:''}); }
   // stuck
@@ -86,6 +86,15 @@ C.flags=function(s){ const st=C.stu[s.id], out=[], P=S.PACE; const ans=ST.answer
   if(stuck.length) out.push({id:s.id+'|stuck',kind:'Stuck on a skill',level:'f-idle',evidence:stuck.map(t=>`${t}: 4+ tries, mastery under 30`),note:''});
   return out.map(f=>Object.assign(f,{dismissed:C.tdata.dismissed.has(f.id),tentativeAny:tentativeUsed.v})); };
 C.sessions=s=>{ const ev=C.stu[s.id].evs.filter(e=>e.type==='session'); return {count:ev.length,idleMs:ev.reduce((a,e)=>a+(Number(e.idleMs)||0),0),offTab:ev.reduce((a,e)=>a+(Number(e.offTab)||0),0),ms:ev.reduce((a,e)=>a+(Number(e.ms)||0),0)}; };
+// Test status for a checkpoint: Not started / In progress / Paused at Q# / Complete (partial results are labeled, never scored as misses)
+C.cpOrder=(()=>{ const N=window.NUMBERING, ids=[]; N.days.forEach(d=>d.steps.forEach(x=>{ if(x.type==='q') ids.push({id:x.id,n:x.n}); })); if(S.PRETEST_INCLUDE_MAP) N.map.forEach(m=>m.steps.forEach(x=>ids.push({id:x.id,n:x.n}))); return ids; })();
+C.cpStatus=(s,cp)=>{ const st=ST.pretestState(C.stu[s.id].evs,cp); const total=C.cpOrder.length, done=st.done.size; const next=C.cpOrder.find(x=>!st.done.has(x.id));
+  const qn=next?(String(next.n).startsWith('M')?next.n:'Q#'+next.n):'';
+  if(st.finished) return {key:'complete',label:'Complete',done,total,cls:'f-work'};
+  if(st.paused) return {key:'paused',label:`Paused at ${qn} · ${done} of ${total} done`,done,total,cls:'f-pause',by:st.paused.type==='teacher_pause'?'teacher':((st.paused.detail||{}).by||'student'),at:st.paused.ts};
+  if(done) return {key:'progress',label:`In progress at ${qn} · ${done} of ${total} done`,done,total,cls:'f-idle'};
+  return {key:'none',label:'Not started',done:0,total,cls:'f-none'}; };
+C.studentAction=(s,type,cp)=>{ const ev=ST.log({sid:s.id,name:s.name,block:s.block,type,mode:'teacher',ctx:cp,detail:{by:'teacher'}}); C.evs=ST.merge(C.evs,[ev]); C.analyze(); };
 C.cpScore=(s,cp)=>{ const st=ST.pretestState(C.stu[s.id].evs,cp); return st.done.size?Object.assign({finished:st.finished,answered:st.done.size},ST.pretestScore(C.stu[s.id].evs,cp)):null; };
 
 // ---------- layout ----------
@@ -127,6 +136,7 @@ C.daysFor=daysFor;
 VIEWS.live=(p)=>{ const draw=async()=>{ const live=await ST.loadLive(C.pin); const vs=C.visible(); const now=Date.now();
     const rows=vs.map(s=>{ const L=live[s.id]; const age=L?(now-new Date(L.seen))/1000:1e9; let flag;
       if(!L||age>Math.max(60,S.LIVE_REFRESH_SECONDS*4)) flag='<span class="flag f-none">Not signed in</span>';
+      else if(L.status==='paused') flag='<span class="flag f-pause">Paused (saved)</span>';
       else if(L.status==='off') flag=`<span class="flag f-off">Off tab ${L.offSec||0}s</span>`; else if(L.status==='idle') flag=`<span class="flag f-idle">Idle ${L.idleSec}s</span>`;
       else if(L.status==='racing') flag='<span class="flag f-race">Racing</span>'; else flag='<span class="flag f-work">Working</span>';
       if(L&&age<=60&&L.sessionMin>=S.PACE.NO_PROGRESS_MINUTES&&!L.answers) flag+=' <span class="flag f-none">No progress</span>';
@@ -159,7 +169,7 @@ VIEWS.students=(p)=>{ const vs=C.visible(); const today=new Date().toLocaleDateS
     const stdGot=Object.entries(st.std).filter(([k,o])=>k.startsWith('PE:')&&o.group==='got').length; const pre=C.cpScore(s,'pre');
     const fl=C.flags(s).filter(x=>!x.dismissed); const rushN=st.evs.filter(e=>e.type==='rush').length;
     const rushTopics=[...new Set(st.evs.filter(e=>e.type==='rush'&&IT[e.item]).map(e=>D.TOPICS[IT[e.item].topic].en))].slice(0,3).join(', ');
-    return `<tr><td><button class="linkbtn" data-sid="${s.id}">${esc(s.name)}</button>${s.archived?' <span class="small">(archived)</span>':''}</td><td>${s.block}</td><td>${pre?`${pre.pct}%${pre.finished?'':' (in progress)'}`:'—'}</td><td>${ids.length}</td><td>${pct(f,ids.length)}%</td><td>${pct(l,ids.length)}%</td><td>+${pct(l,ids.length)-pct(f,ids.length)}</td>
+    return `<tr><td><button class="linkbtn" data-sid="${s.id}">${esc(s.name)}</button>${s.archived?' <span class="small">(archived)</span>':''}</td><td>${s.block}</td><td>${pre?`${pre.pct}%${pre.finished?'':` <span class="flag f-pause">PARTIAL ${pre.answered}/${C.cpOrder.length}</span>`}`:'—'}</td><td>${ids.length}</td><td>${pct(f,ids.length)}%</td><td>${pct(l,ids.length)}%</td><td>+${pct(l,ids.length)-pct(f,ids.length)}</td>
       <td>${sec(ms.length?ms.reduce((a,b)=>a+b,0)/ms.length:null)}</td><td>${rushN}${rushTopics?`<br><span class="small">${esc(rushTopics)}</span>`:''}</td><td>${sec(ses.idleMs)}</td><td>${ses.offTab}</td>
       <td>${Math.round((st.usage[today]||0)/60000)} / ${S.DAILY_GOAL_MINUTES}</td><td>${avgDay.toFixed(0)}</td><td>${mastered} mastered · ${prof} prof.</td><td>${stdGot}/13</td><td>${fl.map(x=>`<span class="flag ${x.level}">${esc(x.kind)}</span>`).join('')}</td></tr>`; });
   p.innerHTML=card(`<h3>👩‍🚀 Students <span class="small muted">click a name for details, suggestions, and standards</span></h3>${C.table(['Student','Blk','Launch Check','Answered','First-try','Latest','Growth','Avg time/q','Rush pauses (topics)','Idle total','Off-tab','Min today / goal','Avg min/day','Skills','PEs got it','Flags'],rows)}`)+'<div id="detail"></div>';

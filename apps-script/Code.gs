@@ -96,10 +96,12 @@ function doGet(e) {
       if (full) { st.added = String(r[4] || ''); st.pretestFirst = r[6] != 0; outR.push(st); } else if (!st.archived) outR.push(st); }
     return json_({ok:true, students: outR, empty: rv.length <= 1});
   }
-  if (p.action === 'student' && p.sid) {
+  // NOTE: "sid" is a reserved URL parameter in Apps Script web apps, so the student id is sent as "stu".
+  var stu = p.stu || p.sid;
+  if (p.action === 'student' && stu) {
     var sh = sheet_('Events', COLS);
     // Teacher-only rows (sid TEACHER: RIT scores, goals, notes) are never returned here.
-    var evs = rowsToEvents_(sh.getDataRange().getValues()).filter(function (x) { return x.sid === p.sid && x.sid !== 'TEACHER'; });
+    var evs = rowsToEvents_(sh.getDataRange().getValues()).filter(function (x) { return x.sid === stu && x.sid !== 'TEACHER'; });
     return json_({ok:true, events: evs});
   }
   if (!pinOk_(p.pin)) return json_({ok:false, error:'pin'});
