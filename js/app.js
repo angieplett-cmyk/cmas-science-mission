@@ -71,7 +71,7 @@ function newSession(){ Object.assign(act,{sessStart:Date.now(),sessIdle:0,sessOf
 // Saves position + time used; pause time never counts toward timing, idle, off-tab, or habit data.
 function pauseInfo(){ const c=window.App.cur||{}; const s=run.steps[run.i]||{}; const Q=c.Q;
   const nextQ=run.steps.slice(run.i).find(x=>x.type!=='read')||{};
-  return {pos:run.i,item:(c.id&&!c.read)?c.id:(nextQ.id||''),n:s.n||nextQ.n||'',qElapsed:Q&&c.id&&!c.read?Math.max(0,Date.now()-Q.t0Orig):0,tries:Q&&!c.read?Q.tries:0,hint:Q&&!c.read?Q.hint:false,
+  return {pos:run.i,item:(c.id&&!c.read)?c.id:(nextQ.id||''),n:s.n||nextQ.n||'',qElapsed:Q&&c.id&&!c.read?Math.max(0,Date.now()-Q.t0Orig):0,onRead:!!c.read,tries:Q&&!c.read?Q.tries:0,hint:Q&&!c.read?Q.hint:false,
     activeMs:(run.activeMs||0)+(Date.now()-run.segStart),answered:run.mode==='checkpoint'?ST.pretestState(evs,run.ctx).done.size:undefined,
     steps:(run.mode==='review'||run.mode==='skill')?run.steps.map(x=>x.id):undefined,title:typeof run.title==='string'?run.title:undefined}; }
 function pauseRun(by){ if(!run||act.paused) return; const d=pauseInfo(); d.by=by||'student';
@@ -155,6 +155,8 @@ function startCheckpoint(cp){ const st=ST.pretestState(evs,cp); const steps=pret
   if(st.paused) ST.log({sid:sess.sid,name:sess.name,block:sess.block,type:'resume',mode:'checkpoint',ctx:cp,item:st.paused.item,detail:{pausedAt:st.paused.ts}});
   const restore=st.paused&&st.paused.type==='pause'?st.paused.detail:null;
   let i=0; while(i<steps.length){ const s=steps[i]; if(s.type==='q'&&st.done.has(s.id)){i++;continue;} if(s.type==='read'){ const nxt=steps.slice(i+1).find(x=>x.type==='q'); if(nxt&&st.done.has(nxt.id)){i++;continue;} } break; }
+  // Resume lands on the exact next unanswered question (skip the story page if they had already read it before pausing)
+  if(restore&&!restore.onRead&&steps[i]&&steps[i].type==='read'&&steps[i+1]&&steps[i+1].id===restore.item) i++;
   const c=(cfg.checkpoints||S.CHECKPOINTS).find(x=>x.id===cp)||{name:cp};
   startRun({mode:'checkpoint',ctx:cp,title:cp==='pre'?T('launch'):c.name,steps,start:i,restore,activeMs:restore?restore.activeMs||0:0}); }
 function startReview(){ const rv=ST.reviewList(evs).filter(r=>!r.fixed); if(!rv.length){ overlay(`<h2>🌟</h2><p>${T('noReview')}</p><button class="btn">OK</button>`,o=>$('button',o).onclick=()=>o.remove()); return; }

@@ -16,7 +16,7 @@ X.growth=(p,C)=>{ const vs=C.visible(), list=cps(C), esc=C.esc;
   const pre=list[0]; const tops={}; vs.forEach(s=>{ const x=C.cpScore(s,pre.id); if(!x) return; Object.entries(x.byTopic).forEach(([t,v])=>{ tops[t]=tops[t]||{e:0,p:0}; tops[t].e+=v.e; tops[t].p+=v.p; }); });
   const tl=Object.entries(tops).sort((a,b)=>a[1].e/a[1].p-b[1].e/b[1].p).slice(0,6);
   const cpSel=C.cpSel||list[0].id;
-  const stRows=vs.map(s=>{ const t=C.cpStatus(s,cpSel); return `<tr><td>${esc(s.name)}</td><td>${s.block}</td><td><span class="flag ${t.cls}">${esc(t.label)}</span>${t.key==='paused'?`<br><span class="small">paused by ${t.by} · ${new Date(t.at).toLocaleString()}</span>`:''}</td>
+  const stRows=vs.map(s=>{ const t=C.cpStatus(s,cpSel); return `<tr data-row="${s.id}"><td>${esc(s.name)}</td><td>${s.block}</td><td><span class="flag ${t.cls}">${esc(t.label)}</span>${t.key==='paused'?`<br><span class="small">paused by ${t.by} · ${new Date(t.at).toLocaleString()}</span>`:''}</td>
     <td>${t.key==='progress'?`<button class="btn sm warn" data-act="teacher_pause" data-sid="${s.id}">⏸ Pause</button>`:''}${t.key==='complete'?`<button class="btn sm ghost" data-act="cp_reopen" data-sid="${s.id}">↩ Reopen (resume)</button>`:''}
     ${t.key!=='none'?` <button class="btn sm ghost" data-act="cp_reset" data-sid="${s.id}">⟲ Reset test</button>`:''}</td></tr>`; });
   const counts={}; vs.forEach(s=>{ const k=C.cpStatus(s,cpSel).key; counts[k]=(counts[k]||0)+1; });
